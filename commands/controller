@@ -1,0 +1,20 @@
+#!/bin/sh
+
+echo "➜ SSH server"
+mkdir sshd
+ssh-keygen -q -t rsa -N '' -f sshd/host_key
+
+cat << __EOF__ > sshd/sshd_config
+Port 2222
+Protocol 2
+UsePrivilegeSeparation no
+HostKey $HOME/sshd/host_key
+PidFile $HOME/sshd/pid
+__EOF__
+
+cp .ssh/id_rsa.pub .ssh/authorized_keys
+/usr/sbin/sshd -f $HOME/sshd/sshd_config -E $HOME/sshd/log
+
+echo "➜ Starting up controller"
+exec ipcontroller --location='127.0.0.1' \
+                  --no-secure

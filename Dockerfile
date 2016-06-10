@@ -1,6 +1,8 @@
 FROM debian:jessie
 MAINTAINER Alexandre Abadie <alexandre.abadie@inria.fr>
 
+ENV SHELL /bin/bash
+
 RUN apt-get update -yqq  && apt-get install -yqq \
   wget \
   bzip2 \
@@ -8,9 +10,16 @@ RUN apt-get update -yqq  && apt-get install -yqq \
   libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
 
-# Configure environment
-ENV LC_ALL=C.UTF-8
-ENV LANG=C.UTF-8
+# Localize en_US.UTF-8
+RUN apt-get update -qq \
+ && echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
+ && apt-get install -yqq locales \
+ && update-locale LANG=en_US.UTF-8
+
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US.UTF-8
+ENV LC_ALL en_US.UTF-8
+ENV PYTHONIOENCODING UTF-8
 
 # Folder to install non-system tools and serve as workspace for the notebook
 # user
@@ -68,11 +77,6 @@ RUN conda install -y \
 COPY requirements.txt .
 RUN pip install -r requirements.txt && rm -rf ~/.cache/pip/
 
-COPY start-notebook.sh ./bin/
-COPY start-engines.sh ./bin/
-COPY start-controller.sh ./bin/
-COPY examples examples
-
 # Configure matplotlib to avoid using QT
 COPY matplotlibrc /work/.config/matplotlib/matplotlibrc
 
@@ -87,7 +91,22 @@ USER root
 # Install Tini that necessary to properly run the notebook service in a docker
 # container:
 # http://jupyter-notebook.readthedocs.org/en/latest/public_server.html#docker-cmd
-ENV TINI_VERSION v0.9.0
-ADD https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini /usr/bin/tini
-RUN chmod +x /usr/bin/tini
-ENTRYPOINT ["/usr/bin/tini", "--"]
+# Add Tini
+RUN wget --quiet https://github.com/krallin/tini/releases/download/v0.9.0/tini \
+ && cp tini /usr/bin/tini && chmod +x /usr/bin/tini
+
+EXPOSE 2222 8888
+ENTRYPOINT ["/usr/bin/tini", "run"]
+
+ENV JUPYTER_ID="basicuser:1000:100"
+ENV JUPYTER_ENGINES_N=""
+ENV JUPYTER_CONTROLLER="controller:9000"
+ENV JUPYTER_NOTEBOOK_PORT="8888"
+ENV JUPYTER_KEY_PUB="$HOME/.ssh/id_rsa.pub"
+ENV JUPYTER_KEY_PRV="$HOME/.ssh/id_rsa"
+CMD ["console"]
+
+COPY run /usr/sbin/run
+COPY commands /docker-commands
+RUN chmod u+x /usr/sbin/run \
+ && chmod +x /docker-commands/*
