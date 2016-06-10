@@ -1,0 +1,33 @@
+version: "2"
+
+services:
+  controller:
+    image: aabadie/ipyparallel:latest
+    ports:
+     - "8889:8889"
+     - "8888:8888"
+    command: start-controller.sh
+    networks:
+      - ipam
+    container_name: controller
+
+  engine:
+    image: aabadie/ipyparallel:latest
+    command: start-engine.sh
+    networks:
+      - ipam
+    links:
+      - controller
+
+networks:
+  ipam:
+    # Enable multi-host communication
+    driver: overlay
+    # Single host communication
+    #driver: bridge
+    config:
+      - subnet: 172.28.0.0/16
+        ip_range: 172.28.5.0/24
+        gateway: 172.28.5.254
+        aux_addresses:
+          controller: 172.28.1.1
